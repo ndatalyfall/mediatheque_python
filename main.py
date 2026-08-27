@@ -18,6 +18,7 @@ def main():
 
     pret = mediatheque.emprunter(awa.numero, "L001")
     print(pret)
+    print(repr(pret))  # __repr__, utile pour le debogage
 
     mediatheque.emprunter(awa.numero, "D001")
     mediatheque.emprunter(awa.numero, "L002")
@@ -46,6 +47,13 @@ def main():
     for doc in mediatheque.emprunts_de(awa.numero):
         print(doc)
 
+    print("\n--- Prets en retard ---")
+    en_retard = list(mediatheque.prets_en_retard())
+    if not en_retard:
+        print("Aucun retard pour le moment.")
+    for pret_en_retard in en_retard:
+        print(pret_en_retard)
+
     mediatheque.rendre(awa.numero, "L001")
     print(f"\nAprès retour de L001, emprunts de {awa.nom} : {len(awa)}")
     print(f"L001 disponible ? {mediatheque._documents['L001'].disponible}")
@@ -62,6 +70,8 @@ def main():
     print("\n--- Tous les documents (via __iter__) ---")
     for doc in mediatheque:
         print(doc)
+
+    print(f"\n{mediatheque!r}")
 
 
 if __name__ == "__main__":

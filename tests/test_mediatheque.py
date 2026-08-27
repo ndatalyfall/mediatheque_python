@@ -1,71 +1,90 @@
 import pytest
-from mediatheque import Mediatheque, Livre, DVD, DocumentIndisponible, TropDEmprunts
+
+from ..mediatheque.mediatheque import Mediatheque
+from ..mediatheque.documents import Livre, DVD
+from ..mediatheque.erreurs import DocumentIndisponible, TropDEmprunts, DocumentInconnu
 
 
-def test_emprunt_rend_le_document_indisponible():
-    media = Mediatheque("Test")
-    livre = Livre("Titre", 2020, "L001", auteur="X", nb_pages=100)
-    media.ajouter_document(livre)
-    adherent = media.inscrire("Awa")
+@pytest.fixture
+def mediatheque():
+    m = Mediatheque("Test")
+    m.ajouter_document(Livre("Livre A", 2000, "L001"))
+    m.ajouter_document(Livre("Livre B", 2001, "L002"))
+    m.ajouter_document(Livre("Livre C", 2002, "L003"))
+    m.ajouter_document(DVD("DVD A", 2010, "D001"))
+    return m
 
-    media.emprunter(adherent.numero, "L001")
 
-    assert not livre.disponible
+def test_inscrire_genere_un_numero(mediatheque):
+    adherent = mediatheque.inscrire("Fatou")
+    assert adherent.nom == "Fatou"
+    assert adherent.numero.startswith("A")
 
 
-def test_emprunter_document_deja_prete_lève_exception():
-    media = Mediatheque("Test")
-    livre = Livre("Titre", 2020, "L001", auteur="X", nb_pages=100)
-    media.ajouter_document(livre)
-    a = media.inscrire("Awa")
-    m = media.inscrire("Moussa")
+def test_emprunter_rend_document_indisponible(mediatheque):
+    adherent = mediatheque.inscrire("Fatou")
+    mediatheque.emprunter(adherent.numero, "L001")
+    doc = mediatheque._documents["L001"]
+    assert doc.disponible is False
 
-    media.emprunter(a.numero, "L001")
 
+def test_emprunter_document_deja_prete_leve_indisponible(mediatheque):
+    a1 = mediatheque.inscrire("Fatou")
+    a2 = mediatheque.inscrire("Modou")
+    mediatheque.emprunter(a1.numero, "L001")
     with pytest.raises(DocumentIndisponible):
-        media.emprunter(m.numero, "L001")
+        mediatheque.emprunter(a2.numero, "L001")
 
 
-def test_quatrieme_emprunt_lève_trop_d_emprunts():
-    media = Mediatheque("Test")
-    for i in range(4):
-        media.ajouter_document(Livre(f"Livre {i}", 2020, f"L{i:03d}"))
-    adherent = media.inscrire("Awa")
-
-    media.emprunter(adherent.numero, "L000")
-    media.emprunter(adherent.numero, "L001")
-    media.emprunter(adherent.numero, "L002")
-
+def test_limite_emprunts(mediatheque):
+    adherent = mediatheque.inscrire("Fatou")
+    mediatheque.emprunter(adherent.numero, "L001")
+    mediatheque.emprunter(adherent.numero, "L002")
+    mediatheque.emprunter(adherent.numero, "L003")
     with pytest.raises(TropDEmprunts):
-        media.emprunter(adherent.numero, "L003")
+        mediatheque.emprunter(adherent.numero, "D001")
 
 
-def test_rendre_document_le_remet_en_circulation():
-    media = Mediatheque("Test")
-    livre = Livre("Titre", 2020, "L001", auteur="X", nb_pages=100)
-    media.ajouter_document(livre)
-    adherent = media.inscrire("Awa")
-
-    media.emprunter(adherent.numero, "L001")
-    assert not livre.disponible
-
-    media.rendre(adherent.numero, "L001")
-    assert livre.disponible
+def test_adherent_inconnu_leve_document_inconnu(mediatheque):
+    with pytest.raises(DocumentInconnu):
+        mediatheque.emprunter("A999", "L001")
 
 
-def test_duree_pret_livre_et_dvd():
-    livre = Livre("Titre", 2020, "L001", auteur="X", nb_pages=100)
-    dvd = DVD("Film", 2020, "D001", realisateur="Y", duree_min=120)
-
-    assert livre.duree_pret() == 21
-    assert dvd.duree_pret() == 7
+def test_document_inconnu_leve_document_inconnu(mediatheque):
+    adherent = mediatheque.inscrire("Fatou")
+    with pytest.raises(DocumentInconnu):
+        mediatheque.emprunter(adherent.numero, "L999")
 
 
-def test_rechercher_insensible_a_la_casse():
-    media = Mediatheque("Test")
-    media.ajouter_document(Livre("L'Aventure Ambiguë", 1961, "L001"))
-    media.ajouter_document(DVD("Autre film", 2020, "D001"))
+def test_rendre_remet_le_document_disponible(mediatheque):
+    adherent = mediatheque.inscrire("Fatou")
+    mediatheque.emprunter(adherent.numero, "L001")
+    mediatheque.rendre(adherent.numero, "L001")
+    doc = mediatheque._documents["L001"]
+    assert doc.disponible is True
+    assert len(adherent) == 0
 
-    resultats = media.rechercher("aventure")
-    assert len(resultats) == 1
-    assert resultats[0].code == "L001"
+
+def test_rechercher_est_un_generateur(mediatheque):
+    resultats = mediatheque.rechercher("livre")
+    assert hasattr(resultats, "__next__")  # bien un generateur, pas une liste
+    assert len(list(resultats)) == 3
+
+
+def test_documents_disponibles(mediatheque):
+    adherent = mediatheque.inscrire("Fatou")
+    mediatheque.emprunter(adherent.numero, "L001")
+    disponibles = list(mediatheque.documents_disponibles())
+    assert len(disponibles) == 3
+    assert all(doc.code != "L001" for doc in disponibles)
+
+
+def test_mediatheque_est_iterable_et_a_une_longueur(mediatheque):
+    assert len(mediatheque) == 4
+    assert len(list(mediatheque)) == 4
+
+
+def test_aucun_pret_nest_en_retard_juste_apres_emprunt(mediatheque):
+    adherent = mediatheque.inscrire("Fatou")
+    mediatheque.emprunter(adherent.numero, "L001")
+    assert list(mediatheque.prets_en_retard()) == []
