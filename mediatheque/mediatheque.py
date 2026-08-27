@@ -56,14 +56,29 @@ class Mediatheque:
             adherent._emprunts.remove(document)
             document.disponible = True
 
-    def rechercher(self, mot: str) -> list:
+    def rechercher(self, mot: str):
+        # Generateur : les resultats sont produits a la demande,
+        # sans construire toute la liste en memoire d'un coup.
         mot_lower = mot.lower()
-        return [doc for doc in self._documents.values() if mot_lower in doc.titre.lower()]
+        for doc in self._documents.values():
+            if mot_lower in doc.titre.lower():
+                yield doc
 
-    def documents_disponibles(self) -> list:
-        return [doc for doc in self._documents.values() if doc.disponible]
+    def documents_disponibles(self):
+        # Generateur, meme principe que rechercher().
+        for doc in self._documents.values():
+            if doc.disponible:
+                yield doc
 
     def emprunts_de(self, numero: str) -> list:
         if numero not in self._adherents:
             raise DocumentInconnu(f"Adhérent {numero} inconnu")
         return self._adherents[numero].emprunts
+
+    def __len__(self) -> int:
+        # len(mediatheque) renvoie le nombre de documents references
+        return len(self._documents)
+
+    def __iter__(self):
+        # Rend la mediatheque directement iterable : for doc in mediatheque
+        return iter(self._documents.values())

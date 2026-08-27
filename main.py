@@ -57,6 +57,12 @@ def main():
     for doc in mediatheque.documents_disponibles():
         print(doc)
 
+    print(f"\nNombre total de documents dans la mediatheque : {len(mediatheque)}")
+
+    print("\n--- Tous les documents (via __iter__) ---")
+    for doc in mediatheque:
+        print(doc)
+
 
 if __name__ == "__main__":
     main()
