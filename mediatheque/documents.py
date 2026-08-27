@@ -38,8 +38,18 @@ class Document(ABC):
             return False
         return self._code == other._code
 
+    def __hash__(self) -> int:
+        # Deux documents de meme code doivent avoir le meme hash,
+        # coherent avec __eq__. Permet d'utiliser un Document dans
+        # un set ou comme cle de dict si besoin.
+        return hash(self._code)
+
     def __str__(self) -> str:
         return f"{self.__class__.__name__} \"{self._titre}\" ({self._annee}) - a rendre sous {self.duree_pret()} jours"
+
+    def __repr__(self) -> str:
+        # Representation technique, utile pour le debogage
+        return f"{self.__class__.__name__}(titre={self._titre!r}, annee={self._annee}, code={self._code!r})"
 
 
 class Livre(Document):
